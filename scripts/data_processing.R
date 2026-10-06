@@ -44,10 +44,8 @@ storage.mode(dat) <- "numeric"
 # check num of species in data.frame compared to phylogeny
 species <- trimws(as.character(df[[1]]))
 sum(species %in% tree$tip.label)
-head(setdiff(species, tree$tip.label))
 # 121 sp
 
-plot(tree)
 tdat <- treedata(tree,dat)
 
 head(tdat)
