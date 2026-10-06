@@ -10,6 +10,10 @@ fossorial<-rep(1, length(species))
 fossorial[df[,4]=="terrestrial"]<-2
 names(fossorial)<-row.names(dat_disc)
 
+###################
+###### PLOT #######
+###################
+
 # set up a vector of "grey" for the length of the fossorial vector
 colr<-rep("grey", length(fossorial))
 # where fossorial = 2 replace "grey" with "darkgreen"
