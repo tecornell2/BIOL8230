@@ -10,7 +10,7 @@ Original dataset: *jbi14547-sup-0003-appendixs3.xlsx* "Aus_Sphen_dataset"
 #### Quick start
 Download the following:
 * Script (*process_data.R*)
-* Phylogeny (**)
+* Phylogeny (*squamate-phylo.txt*)
 * Raw data (*jbi14547-sup-0003-appendixs3.csv*)
 ---
 
