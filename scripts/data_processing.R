@@ -29,23 +29,34 @@ summary(df)
 # 8 NAs in tll
 # 27 NAs in ps_vn
 
-# transform data
-dat <- df[, -1, drop = FALSE]
-rownames(dat) <- species
 
-# geiger expects continuous trait data
-dat <- as.matrix(dat)
-storage.mode(dat) <- "numeric"
+##############################
+####### TRANSFORM DATA #######
+##############################
+
+# data broken down into two sets- discrete and continuous
+
+# continuous trait data
+dat_cont <- df[, -(1:4), drop = FALSE]
+rownames(dat_cont) <- species
+dat_cont <- as.matrix(dat_cont)
+
+# discrete trait data
+dat_disc <- df[,4, drop = FALSE]
+rownames(dat_disc) <- species
+dat_disc <- as.matrix(dat_disc)
+
 
 ###########################
 ######## PHYLOGENY ########
 ###########################
 
 # check num of species in data.frame compared to phylogeny
-species <- trimws(as.character(df[[1]]))
 sum(species %in% tree$tip.label)
 # 121 sp
 
-tdat <- treedata(tree,dat)
 
-head(tdat)
+tdat_cont <- treedata(tree,dat_cont)
+
+tdat_disc <- treedata(tree,dat_disc)
+
