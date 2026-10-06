@@ -1,3 +1,9 @@
+# used the following variables from data_processing.R
+      # df
+      # species
+      # dat_disc
+      # tdat_disc
+
 # create vector for fossoriality data
 
 fossorial<-rep(1, length(species))
