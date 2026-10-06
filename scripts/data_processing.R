@@ -29,15 +29,26 @@ summary(df)
 # 8 NAs in tll
 # 27 NAs in ps_vn
 
+# transform data
+dat <- df[, -1, drop = FALSE]
+rownames(dat) <- species
+
+# geiger expects continuous trait data
+dat <- as.matrix(dat)
+storage.mode(dat) <- "numeric"
+
+
 #####################
 ##### PHYLOGENY #####
 #####################
 
+# check num of species in data.frame compared to phylogeny
+species <- trimws(as.character(df[[1]]))
+sum(species %in% tree$tip.label)
+head(setdiff(species, tree$tip.label))
+# 121 sp
+
 plot(tree)
+tdat <- treedata(tree,dat)
 
-node_num <- getMRCA(tree,c("Ophioscincus_truncatus","Lerista_kennedyensis"))
-cladeG_tree <- extract.clade(tree,node_num)
-
-plot(cladeG_tree)
-
-dat <- treedata(cladeG_tree,df) # no nodes????
+head(tdat)
