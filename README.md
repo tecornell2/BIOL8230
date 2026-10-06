@@ -6,6 +6,14 @@ Original dataset: *jbi14547-sup-0003-appendixs3.xlsx* "Aus_Sphen_dataset"
 
 121 species across Sphenomorphinae
 
+---
+#### Quick start
+Download the following:
+* Script (*process_data.R*)
+* Phylogeny (**)
+* Raw data (*jbi14547-sup-0003-appendixs3.csv*)
+---
+
 #### Focal clades
 
 Name | Limb-reduced genera included | Limbed representatives
