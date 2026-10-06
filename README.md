@@ -1,10 +1,10 @@
 # BIOL8230
-Macroevolutionary Methods
-
 
 ### Data
 
-jbi14547-sup-0003-appendixs3 "Aus_Sphen_dataset"
+Original dataset: *jbi14547-sup-0003-appendixs3.xlsx* "Aus_Sphen_dataset"
+
+121 species across Sphenomorphinae
 
 #### Focal clades
 
@@ -17,7 +17,7 @@ Lerista | Lerista, Ctenotus	| Lerista, Ctenotus |
 Other | |
 
 
-#### Descriptors in dataframe
+#### Descriptors in data frame (df)
 Abbr | Description | Unit
 --- | --- | ---
 species | | *chr*
@@ -27,9 +27,9 @@ substrate_category | classification of four categories from poorest to richest o
 man | number of fingers | *int*
 pes	|  number of toes | *int*
 disparity | value from -1 (sp. with only forelimbs) to 1 (sp. with only hindlimbs) | *num*
-hd_l | head length | 
-fll	| forelimb length |
-hll	 | hindlimb length |
+hd_l | head length | mm
+fll	| forelimb length | mm
+hll	 | hindlimb length | mm
 svl	| snout-vent length | mm
 ps_vn | presacral vertebrae numbers | *int*
 fl_presence | presence of front limbs | *binary*
@@ -39,23 +39,15 @@ bdw | bulk density of the whole soil | g/cm^3
 cl_y | clay: <2um mass fraction of the soil | %
 slt | silt: 2-20um mass fraction of the soil | %
 sn_d | sand: 20um-2mm mass fraction of the soil | %
-so_c | soil organic carbon
+so_c | soil organic carbon | %
 soil_temp | temperature | C
 t | air temperature (1cm above soil) | C 
 rain | rainfall | mm
-soilmoist | | 
-soilhum | | 
+soilmoist | moisture (2.5cm in soil column) | g/m^3
+soilhum | humidity (5cm in soil column) | g/m^3
+pot | soil water potential (2.5cm in soil column) | kPa
 rh | soil relative humidity | %
 soilwet | wetness index (2.5 cm in soil column) | %
-
-
-#### Added field values
-Abbr | Full name
---- | ---
-lnHdL |	log head length
-lnFLL	| log forelimb length
-lnHLL	 | log hindlimb length
-lnSVL	| log snout-vent length
 
 
 #### References
