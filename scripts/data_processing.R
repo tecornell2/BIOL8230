@@ -13,9 +13,7 @@ library(geiger)
 raw <- read.csv("/home/tecorn/BIOL8230/jbi14547-sup-0003-appendixs3.csv")
 tree <- read.tree("/home/tecorn/BIOL8230/squamate_phylogeny.txt")
 
-######################
 ##### DATA FRAME #####
-######################
 
 df <- df_raw %>%
   select(-c(PC1, PC2, Data.sources, Reference,Long,Lat)) %>% # remove PCs, references, and coordinates
@@ -38,9 +36,7 @@ dat <- as.matrix(dat)
 storage.mode(dat) <- "numeric"
 
 
-#####################
 ##### PHYLOGENY #####
-#####################
 
 # check num of species in data.frame compared to phylogeny
 species <- trimws(as.character(df[[1]]))
