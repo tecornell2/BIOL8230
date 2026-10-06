@@ -6,7 +6,7 @@
 
 # create vector for fossoriality data
 
-fossorial<-rep(1, length(species))
+fossorial<-rep(1, length(species)) # vector of only 1s
 fossorial[df[,4]=="terrestrial"]<-2
 names(fossorial)<-row.names(dat_disc)
 
@@ -14,10 +14,8 @@ names(fossorial)<-row.names(dat_disc)
 ###### PLOT #######
 ###################
 
-# set up a vector of "grey" for the length of the fossorial vector
-colr<-rep("grey", length(fossorial))
-# where fossorial = 2 replace "grey" with "darkgreen"
-colr[fossorial == 2]<-"darkgreen" 
+colr<-rep("grey", length(fossorial)) # grey = fossorial = 1
+colr[fossorial == 2]<-"darkgreen" # darkgreen = terrestrial = 2
 names(colr)<-names(fossorial)
 colr<-colr[tdat_disc$phy$tip.label]
 
