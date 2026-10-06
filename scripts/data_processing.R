@@ -35,4 +35,9 @@ summary(df)
 
 plot(tree)
 
-dat <- treedata(tree,df) # no nodes????
+node_num <- getMRCA(tree,c("Ophioscincus_truncatus","Lerista_kennedyensis"))
+cladeG_tree <- extract.clade(tree,node_num)
+
+plot(cladeG_tree)
+
+dat <- treedata(cladeG_tree,df) # no nodes????
