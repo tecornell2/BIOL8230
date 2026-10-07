@@ -61,3 +61,5 @@ soilwet | wetness index (2.5 cm in soil column) | %
 #### References
 
 Camaiti, M., Evans, A. R., Hipsley, C. A., Hutchinson, M. N., Meiri, S., de Oliveira Anderson, R., Slavenko, A., & Chapple, D. G. (2023). Macroecological and biogeographical patterns of limb reduction in the world's skinks. Journal of Biogeography, 50, 428–440. https://doi.org/10.1111/jbi.14547
+
+Zheng, Yuchi & Wiens, John. (2015). Combining phylogenomic and supermatrix approaches, and a time-calibrated phylogeny for squamate reptiles (lizards and snakes) based on 52 genes and 4162 species. Molecular phylogenetics and evolution. 94. 10.1016/j.ympev.2015.10.009. 
