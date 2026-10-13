@@ -58,3 +58,81 @@ nodelabels(
   bg = "white",
   adj = c(0, 0.3)
 )
+
+
+
+#I could not get the code above this to run so this is what I did to get the same plot from above 
+###########################
+###### Logan's Code #######
+###########################
+###########################
+###### PLOT: GENERA #######
+###########################
+
+phy <- tdat_disc$phy
+
+# define genera (from each focal group)
+focal_clades <- list(
+  "Anomalopus group" = c(
+    "Anomalopus", "Calyptotis", "Coeranoscincus",
+    "Coggeria", "Ophioscincus", "Concinnia",
+    "Nangura", "Silvascincus"
+  ),
+  "Glaphyromorphus" = c("Glaphyromorphus", "Eulamprus"),
+  "Hemiergis" = c("Hemiergis", "Eremiascincus"),
+  "Lerista" = c("Lerista", "Ctenotus")
+)
+
+# extract genus (that is the name for each genus)
+genus <- sub("_.*", "", phy$tip.label)
+
+# getting the node for each focal group
+nodes <- sapply(focal_clades, function(genera) {
+  tips <- phy$tip.label[genus %in% genera]
+  if (length(tips) > 1) getMRCA(phy, tips) else NA
+})
+
+box_cols <- c(
+  "Anomalopus group" = "blue",
+  "Glaphyromorphus"  = "orange",
+  "Hemiergis"        = "green",
+  "Lerista"          = "red"
+)
+
+# plot tree
+plot(
+  phy, show.tip.label = TRUE,
+  main = "121 species of Sphenomorphinae",
+  cex = 0.3
+)
+
+# opaque outline
+for (group in names(nodes)) {
+  if (!is.na(nodes[group])) {
+    box <- cladebox(
+      node = nodes[group],
+      col = adjustcolor(box_cols[group], alpha.f = 0.15)
+    )
+    
+    polygon(
+      box$x, box$y,
+      col = NA,
+      border = box_cols[group],
+      lwd = 1.5
+    )
+  }
+}
+
+# focal-group labels
+nodelabels(
+  text = names(nodes),
+  node = nodes,
+  cex = 0.7,
+  bg = "white",
+  adj = c(0, 0.3)
+)
+
+
+
+
+
