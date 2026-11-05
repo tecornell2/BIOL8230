@@ -1,0 +1,497 @@
+---
+title: "Maelan 3M Project"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+date: "2026-10-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## Packages
+
+```{r}
+#install.packages("janitor")
+#install.packages("caper")
+#install.packages("patchwork")
+library(janitor)
+library(ape)
+library(geiger)
+library(phytools)
+library(ggplot2)
+library(caper)
+library(patchwork)
+
+```
+
+## Import Data
+
+```{r}
+raw <- read.csv("C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/jbi14547-sup-0003-appendixs3.csv")
+tree <- read.tree("C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/squamate-phylo.txt")
+
+```
+
+## Data Frame
+
+```{r}
+
+df <- raw %>%
+  dplyr::select(-c(PC1, PC2, Data.sources, Reference, Long, Lat)) %>%
+  janitor::clean_names() %>%
+  dplyr::distinct()
+
+print(names(df))
+
+summary(df)
+
+```
+
+## Transform Data
+
+Discrete Vs. Continuous
+
+```{r}
+# DISCRETE
+dat_disc <- df[,4, drop = FALSE]
+rownames(dat_disc) <- df$species
+dat_disc <- as.matrix(dat_disc)
+
+colnames(df)
+head(df)
+
+#CONTINUOUS
+dat_cont <- df[, -(1:4), drop = FALSE]
+rownames(dat_cont) <- df$species
+dat_cont <- as.matrix(dat_cont)
+
+```
+
+
+## PHYLOGENY
+
+```{r}
+sum(df$species %in% tree$tip.label) # 121 species
+
+
+tdat_cont <- treedata(tree,dat_cont)
+tdat_disc <- treedata(tree,dat_disc)
+
+```
+
+## Create Vector for Fossoriality Data
+
+```{r}
+fossorial<-rep(1, length(df$species)) # vector of only 1s
+fossorial[df[,4]=="terrestrial"]<-2
+names(fossorial)<-row.names(dat_disc)
+
+```
+
+## PLOT FOSSORIAL
+
+```{r}
+colr<-rep("grey", length(fossorial)) # grey = fossorial = 1
+colr[fossorial == 2]<-"darkgreen" # darkgreen = terrestrial = 2
+names(colr)<-names(fossorial)
+colr<-colr[tdat_disc$phy$tip.label]
+
+# plot tree with fossorial trait at tips
+plot(tdat_disc$phy, show.tip.label = FALSE)
+tiplabels(pch = 16, col = colr, cex = 1)
+
+```
+
+## PLOT GENERA
+
+```{r}
+phy <- tdat_disc$phy
+
+#pdf(
+ #"C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/GeneraPhylogeny.pdf",
+ #width = 10,
+  #height = 12
+#)
+
+#par(mar = c(6, 4, 4, 2) + 0.1)
+
+# define genera (from each focal group)
+focal_clades <- list(
+  "Anomalopus" = c(
+    "Anomalopus", "Calyptotis", "Coeranoscincus",
+    "Coggeria", "Ophioscincus", "Concinnia",
+    "Nangura", "Silvascincus"
+  ),
+  "Glaphyromorphus" = c("Glaphyromorphus", "Eulamprus"),
+  "Hemiergis" = c("Hemiergis", "Eremiascincus"),
+  "Lerista" = c("Lerista", "Ctenotus")
+)
+
+# extract genus (that is the name for each genus)
+genus <- sub("_.*", "", phy$tip.label)
+
+# getting the node for each focal group
+nodes <- sapply(focal_clades, function(genera) {
+  tips <- phy$tip.label[genus %in% genera]
+  if (length(tips) > 1) getMRCA(phy, tips) else NA
+})
+
+box_cols <- c(
+  "Anomalopus" = "violet",
+  "Glaphyromorphus" = "blue",
+  "Hemiergis" = "skyblue",
+  "Lerista" = "maroon"
+)
+
+# plot tree
+plot(
+  phy, show.tip.label = TRUE,
+  main = "121 species of Sphenomorphinae",
+  cex = 0.5
+)
+
+par(xpd = NA)
+
+legend(
+  "bottom",
+  inset = c(0, -0.15),
+  legend = names(box_cols),
+  pch = 21,
+  pt.bg = box_cols,
+  horiz = TRUE,
+  bty = "n",
+  cex = 0.9
+)
+
+
+# opaque outline
+for (group in names(nodes)) {
+  if (!is.na(nodes[group])) {
+    box <- cladebox(
+      node = nodes[group],
+      col = adjustcolor(box_cols[group], alpha.f = 0.15)
+    )
+    
+    polygon(
+      box$x, box$y,
+      col = NA,
+      border = box_cols[group],
+      lwd = 1.5
+    )
+  }
+}
+
+#dev.off()
+```
+## POLYMORPHOSPACE
+
+```{r}
+graphics.off()
+
+#pdf(
+ #"C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/Polymorphospace.pdf",
+ #width = 10,
+  #height = 12
+#)
+
+tree <- tdat_disc$phy
+
+focal_genera <- list(
+  "Anomalopus" = c(
+    "Anomalopus", "Calyptotis", "Coeranoscincus",
+    "Coggeria", "Ophioscincus", "Concinnia",
+    "Nangura", "Silvascincus"
+  ),
+  "Glaphyromorphus" = c("Glaphyromorphus", "Eulamprus"),
+  "Hemiergis" = c("Hemiergis", "Eremiascincus"),
+  "Lerista" = c("Lerista", "Ctenotus")
+)
+
+box_cols <- c(
+  "Anomalopus" = "violet",
+  "Glaphyromorphus" = "blue",
+  "Hemiergis" = "skyblue",
+  "Lerista" = "maroon"
+)
+
+# Assign focal groups
+genus <- sub("_.*$", "", df$species)
+df$focal_group <- NA_character_
+
+for (grp in names(focal_genera)) {
+  df$focal_group[genus %in% focal_genera[[grp]]] <- grp
+}
+
+limb_traits <- c("fll", "hll", "tll")
+
+limb_labels <- c(
+  fll = "Front limb length",
+  hll = "Hind limb length",
+  tll = "Total limb length"
+)
+
+# Reset plotting device and layout
+layout(matrix(c(1, 2, 3,
+                4, 4, 4),
+              nrow = 2, byrow = TRUE),
+       heights = c(4, 1))
+
+par(mar = c(5, 4, 3, 1))
+
+
+for (trait in limb_traits) {
+  
+  plot_df <- df[
+    complete.cases(df[, c("species", "bd_wmean", trait)]) &
+      df$species %in% tree$tip.label,
+  ]
+  
+  X <- as.matrix(plot_df[, c("bd_wmean", trait)])
+  rownames(X) <- plot_df$species
+  colnames(X) <- c("Soil bulk density", limb_labels[trait])
+  
+  td <- geiger::treedata(
+    phy = tree,
+    data = X,
+    sort = TRUE,
+    warnings = TRUE
+  )
+  
+  X_matched <- td$data[td$phy$tip.label, , drop = FALSE]
+  
+  # Match focal groups to the tree-tip order
+  matched_rows <- match(td$phy$tip.label, plot_df$species)
+  matched_groups <- plot_df$focal_group[matched_rows]
+  point_cols <- unname(box_cols[matched_groups])
+  
+  # Draw branches and morphospace without visible tip symbols
+  phytools::phylomorphospace(
+    tree = td$phy,
+    X = X_matched,
+    label = "off",
+    xlab = "Soil bulk density",
+    ylab = limb_labels[trait],
+    node.size = c(0, 0),
+    pch = NA,
+    col = "grey40",
+    cex = 0
+  )
+  
+  # Draw colored terminal nodes at the exact branch endpoints
+  points(
+    X_matched[, 1],
+    X_matched[, 2],
+    pch = 21,
+    bg = point_cols,
+    col = "black",
+    cex = 1.1
+  )
+  
+  title(main = paste("Soil density vs.", limb_labels[trait]))
+}
+
+#par(mfrow = c(1, 1))
+par(mar = c(0,0,0,0))
+
+plot.new()
+
+legend(
+  "center",
+  legend = c("Focal Group", names(box_cols)),
+  pch = c(NA, rep(21, length(box_cols))),
+  pt.bg = c(NA, box_cols),
+  col = c(NA, rep("black", length(box_cols))),
+  horiz = TRUE,
+  bty = "n",
+  pt.cex = 2,
+  x.intersp = 1.2,
+  inset = c(-0.1, -0.15),
+  cex = 1.4
+)
+
+#dev.off()
+```
+## LINEAGE THROUGH TIME PLOT (Maelan Code)
+
+```{r}
+graphics.off()
+
+#pdf(
+ #"C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/LTTPlot.pdf",
+ #width = 10,
+  #height = 12
+#)
+
+ltt.plot(
+  tree,
+  log = "y",
+  lwd = 2,
+  col = "darkgreen",
+  main = "Lineage Through Time Plot",
+  xlab = "Time before present",
+  ylab = "Log (Number of Lineages)"
+)
+
+#dev.off()
+```
+## REGRESSION PGLs (Maelan Code)
+
+``` {r}
+
+#pdf(
+ #"C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/RegressionPGL.pdf",
+ #width = 10,
+  #height = 12
+#)
+
+traits <- c("fll", "hll", "tll")
+
+plots <- list()
+
+for(i in seq_along(traits)) {
+
+  trait <- traits[i]
+
+  # Create dataset for this trait
+  plot_dat <- df[, c("species","focal_group", "bd_wmean", trait)]
+  plot_dat <- na.omit(plot_dat)
+
+  # Comparative data object
+  comp_dat <- comparative.data(
+    phy = tdat_disc$phy,
+    data = plot_dat,
+    names.col = "species",
+    vcv = TRUE
+  )
+
+  # PGLS model
+  mod <- pgls(
+    as.formula(paste(trait, "~ bd_wmean")),
+    data = comp_dat,
+    lambda = "ML"
+  )
+
+  print(summary(mod))
+
+  # Create prediction values
+  pred <- data.frame(
+    bd_wmean = seq(
+      min(plot_dat$bd_wmean),
+      max(plot_dat$bd_wmean),
+      length.out = 100
+    )
+  )
+
+  pred$fit <- predict(mod, newdata = pred)
+
+  # Plot
+  plots[[i]] <- ggplot(plot_dat,
+                       aes(x = bd_wmean,
+                           y = .data[[trait]],
+                           color = focal_group)) +
+    geom_point(size = 3) +
+    geom_line(
+      data = pred,
+      aes(x = bd_wmean, y = fit),
+      color = "black",
+      linewidth = 1
+    ) +
+     scale_color_manual(
+  values = c(
+    "Anomalopus" = "violet",
+    "Glaphyromorphus" = "blue",
+    "Hemiergis" = "skyblue",
+    "Lerista" = "maroon"
+  ),
+  name = "Focal Group"
+)+
+    theme_classic() +
+    labs(
+      x = "Soil bulk density",
+  y = trait,
+  title = c(
+    "Front Limb Length",
+    "Hind Limb Length",
+    "Total Limb Length"
+  )[i]
+    )
+  
+}
+
+# Display all three plots together
+(plots[[1]] | plots[[2]] | plots[[3]]) +
+  plot_layout(guides = "collect") &
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 12),
+    legend.title = element_text (size = 14))
+
+#dev.off()
+```
+
+## FIT MODELS (Maelan Code)
+
+- the best fit for all traits is the pagel's lambda model
+
+```{r}
+
+traits <- c("fll", "hll", "tll")
+
+model_results <- list()
+
+for(trait in traits){
+
+  trait_dat <- df[, c("species", trait)]
+  trait_dat <- na.omit(trait_dat)
+
+  trait_vec <- trait_dat[[trait]]
+  names(trait_vec) <- trait_dat$species
+
+  td <- treedata(tree, trait_vec)
+
+  vec <- td$data[,1]
+  names(vec) <- rownames(td$data)
+
+  BM_fit <- fitContinuous(td$phy, vec, model = "BM")
+  OU_fit <- fitContinuous(td$phy, vec, model = "OU")
+  EB_fit <- fitContinuous(td$phy, vec, model = "EB")
+  WN_fit <- fitContinuous(td$phy, vec, model = "white")
+  Lambda_fit <- fitContinuous(td$phy, vec, model = "lambda")
+
+  model_results[[trait]] <- data.frame(
+    Trait = trait,
+    Model = c("BM","OU","EB","White","Lambda"),
+    logLik = c(
+    BM_fit$opt$lnL,
+    OU_fit$opt$lnL,
+    EB_fit$opt$lnL,
+    WN_fit$opt$lnL,
+    Lambda_fit$opt$lnL
+  ),
+    AICc = c(
+      BM_fit$opt$aicc,
+      OU_fit$opt$aicc,
+      EB_fit$opt$aicc,
+      WN_fit$opt$aicc,
+      Lambda_fit$opt$aicc
+    )
+  )
+}
+
+all_models <- do.call(rbind, model_results)
+
+all_models <- all_models %>%
+  group_by(Trait) %>%
+  mutate(
+    Delta_AICc = AICc - min(AICc),
+    RelLik = exp(-0.5 * Delta_AICc),
+    AkaikeWeight = RelLik / sum(RelLik)
+  ) %>%
+  arrange(Trait, Delta_AICc)
+
+all_models
+```
