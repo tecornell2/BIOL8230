@@ -1,0 +1,1652 @@
+---
+title: "3M Group Project"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Packages
+
+```{r}
+#install.packages("janitor")
+library(janitor)
+library(ape)
+library(geiger)
+library(phytools)
+library(ggplot2) # used this for plotting visualizations. Personally most familiar with this package for plotting
+library(patchwork) # used with ggplot2 to get multiple plots on one page
+library(phylolm)
+library(dplyr)
+
+```
+
+## Import Data
+
+```{r}
+raw <- read.csv("C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/jbi14547-sup-0003-appendixs3.csv")
+tree <- read.tree("C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/squamate-phylo.txt")
+
+#raw <- read.csv("jbi14547-sup-0003-appendixs3.csv")
+#tree <- read.tree("squamate-phylo.txt")
+```
+
+## Data Frame
+
+```{r}
+
+df <- raw %>%
+  dplyr::select(-c(PC1, PC2, Data.sources, Reference, Long, Lat)) %>%
+  janitor::clean_names() %>%
+  dplyr::distinct()
+
+# Adjusting data set so that all the species used have values for forelimb length, hindlimb length, total limb length, and head length
+
+df <- df %>%
+  dplyr::filter(
+    !is.na(hd_l),
+    !is.na(fll),
+    !is.na(hll),
+    !is.na(tll)
+  )
+
+summary(df[,c(
+  "hd_l",
+  "fll",
+  "hll",
+  "tll",
+  "bd_wmean"
+)])
+
+#print(names(df))
+
+#summary(df)
+
+```
+
+## Transform Data
+
+Discrete Vs. Continuous
+
+```{r}
+# DISCRETE 
+dat_disc <- df[,4, drop = FALSE]
+rownames(dat_disc) <- df$species
+dat_disc <- as.matrix(dat_disc)
+
+colnames(df)
+head(df)
+
+#CONTINUOUS
+dat_cont <- df[, -(1:4), drop = FALSE]
+rownames(dat_cont) <- df$species
+dat_cont <- as.matrix(dat_cont)
+
+```
+
+
+## PHYLOGENY
+
+```{r}
+sum(df$species %in% tree$tip.label) 
+
+
+tdat_cont <- treedata(tree,dat_cont)
+tdat_disc <- treedata(tree,dat_disc)
+
+```
+
+## Create Vector for Fossoriality Data
+
+```{r}
+fossorial<-rep(1, length(df$species)) # vector of only 1s
+fossorial[df[,4]=="terrestrial"]<-2
+names(fossorial)<-row.names(dat_disc)
+
+```
+
+## PLOT FOSSORIAL
+
+```{r}
+colr<-rep("grey", length(fossorial)) # grey = fossorial = 1
+colr[fossorial == 2]<-"darkgreen" # darkgreen = terrestrial = 2
+names(colr)<-names(fossorial)
+colr<-colr[tdat_disc$phy$tip.label]
+
+# plot tree with fossorial trait at tips
+plot(tdat_disc$phy, show.tip.label = FALSE)
+tiplabels(pch = 16, col = colr, cex = 1)
+
+```
+
+## PLOT GENERA
+
+```{r}
+phy <- tdat_disc$phy
+
+#pdf(
+# "C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/GeneraPhylogeny.pdf",
+ #width = 10,
+ # height = 12
+#)
+
+# define genera (from each focal group)
+focal_clades <- list(
+  "Anomalopus" = c(
+    "Anomalopus", "Calyptotis", "Coeranoscincus",
+    "Coggeria", "Ophioscincus", "Concinnia",
+    "Nangura", "Silvascincus"
+  ),
+  "Glaphyromorphus" = c("Glaphyromorphus", "Eulamprus"),
+  "Hemiergis" = c("Hemiergis", "Eremiascincus"),
+  "Lerista" = c("Lerista", "Ctenotus")
+)
+
+# extract genus (that is the name for each genus)
+genus <- sub("_.*", "", phy$tip.label)
+
+# getting the node for each focal group
+nodes <- sapply(focal_clades, function(genera) {
+  tips <- phy$tip.label[genus %in% genera]
+  if (length(tips) > 1) getMRCA(phy, tips) else NA
+})
+
+box_cols <- c(
+  "Anomalopus" = "violet",
+  "Glaphyromorphus" = "blue",
+  "Hemiergis" = "skyblue",
+  "Lerista" = "maroon"
+)
+
+# plot tree
+plot(
+  phy, show.tip.label = TRUE,
+  main = "Sphenomorphinae Phylogeny",
+  cex = 0.5
+)
+
+par(xpd = NA)
+
+legend(
+  "bottom",
+  inset = c(0, 0.-0.15),
+  legend = names(box_cols),
+  pch = 21,
+  pt.bg = box_cols,
+  horiz = TRUE,
+  bty = "n",
+  cex = 0.9
+)
+
+
+# opaque outline
+for (group in names(nodes)) {
+  if (!is.na(nodes[group])) {
+    box <- cladebox(
+      node = nodes[group],
+      col = adjustcolor(box_cols[group], alpha.f = 0.15)
+    )
+    
+    polygon(
+      box$x, box$y,
+      col = NA,
+      border = box_cols[group],
+      lwd = 1.5
+    )
+  }
+}
+
+#dev.off()
+```
+## POLYMORPHOSPACE With Raw Limb Length
+
+```{r}
+graphics.off()
+
+#pdf(
+ #"C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/Polymorphospace.pdf",
+# width = 10,
+ # height = 12
+#)
+
+tree <- tdat_disc$phy
+
+focal_genera <- list(
+  "Anomalopus" = c(
+    "Anomalopus", "Calyptotis", "Coeranoscincus",
+    "Coggeria", "Ophioscincus", "Concinnia",
+    "Nangura", "Silvascincus"
+  ),
+  "Glaphyromorphus" = c("Glaphyromorphus", "Eulamprus"),
+  "Hemiergis" = c("Hemiergis", "Eremiascincus"),
+  "Lerista" = c("Lerista", "Ctenotus")
+)
+
+box_cols <- c(
+  "Anomalopus" = "violet",
+  "Glaphyromorphus" = "blue",
+  "Hemiergis" = "skyblue",
+  "Lerista" = "maroon"
+)
+
+# Assigning focal groups
+genus <- sub("_.*$", "", df$species)
+df$focal_group <- NA_character_
+
+for (grp in names(focal_genera)) {
+  df$focal_group[genus %in% focal_genera[[grp]]] <- grp # groups based on genus names
+}
+
+# Raw limb length (not accounting for head length)
+
+limb_traits <- c("fll", "hll", "tll")
+
+limb_labels <- c(
+  fll = "Front limb length",
+  hll = "Hind limb length",
+  tll = "Total limb length"
+)
+
+
+# Reset plotting device and layout
+layout(matrix(c(1, 2, 3,
+                4, 4, 4),
+              nrow = 2, byrow = TRUE),
+       heights = c(4, 1))
+
+par(mar = c(5, 4, 3, 1))
+
+
+for (trait in limb_traits) {
+  
+  plot_df <- df[
+    complete.cases(df[, c("species", "bd_wmean", "focal_group", trait)]) &
+      df$species %in% tree$tip.label,
+  ]
+  
+  X <- as.matrix(plot_df[, c("bd_wmean", trait)])
+  rownames(X) <- plot_df$species
+  colnames(X) <- c("Soil bulk density", limb_labels[trait])
+  
+  td <- geiger::treedata(
+    phy = tree,
+    data = X,
+    sort = TRUE,
+    warnings = TRUE
+  )
+  
+  X_matched <- td$data[td$phy$tip.label, , drop = FALSE]
+  
+  # Matching focal groups with tree tip
+  matched_rows <- match(td$phy$tip.label, plot_df$species)
+  matched_groups <- plot_df$focal_group[matched_rows]
+  point_cols <- unname(box_cols[matched_groups])
+  
+  # Creating morphospace
+  phytools::phylomorphospace(
+    tree = td$phy,
+    X = X_matched,
+    label = "off",
+    xlab = "Soil bulk density",
+    ylab = limb_labels[trait],
+    node.size = c(0, 0),
+    pch = NA,
+    col = "grey40",
+    cex = 0
+  )
+  
+  # Creating terminal nodes
+  points(
+    X_matched[, 1],
+    X_matched[, 2],
+    pch = 21,
+    bg = point_cols,
+    col = "black",
+    cex = 1.1
+  )
+  
+  title(main = paste("Soil density vs.", limb_labels[trait]))
+}
+
+# Adding legend
+par(mar = c(0,0,0,0))
+
+plot.new()
+
+legend(
+  "center",
+  legend = c("Focal Group", names(box_cols)),
+  pch = c(NA, rep(21, length(box_cols))),
+  pt.bg = c(NA, box_cols),
+  col = c(NA, rep("black", length(box_cols))),
+  horiz = TRUE,
+  bty = "n",
+  pt.cex = 2,
+  x.intersp = 1.2,
+  inset = c(-0.1, -0.15),
+  cex = 1.4
+)
+
+#dev.off()
+```
+
+## POLYMORPHOSPACE with Relative Limb Length
+
+```{r}
+
+graphics.off()
+
+# Calculating relative limb lengths
+df$rel_fll <- df$fll / df$hd_l
+df$rel_hll <- df$hll / df$hd_l
+df$rel_tll <- df$tll / df$hd_l
+
+tree <- tdat_disc$phy
+
+focal_genera <- list(
+  "Anomalopus" = c(
+    "Anomalopus", "Calyptotis", "Coeranoscincus",
+    "Coggeria", "Ophioscincus", "Concinnia",
+    "Nangura", "Silvascincus"
+  ),
+  "Glaphyromorphus" = c("Glaphyromorphus", "Eulamprus"),
+  "Hemiergis" = c("Hemiergis", "Eremiascincus"),
+  "Lerista" = c("Lerista", "Ctenotus")
+)
+
+box_cols <- c(
+  "Anomalopus" = "violet",
+  "Glaphyromorphus" = "blue",
+  "Hemiergis" = "skyblue",
+  "Lerista" = "maroon"
+)
+
+# Assigning focal groups
+genus <- sub("_.*$", "", df$species)
+df$focal_group <- NA_character_
+
+for (grp in names(focal_genera)) {
+  df$focal_group[genus %in% focal_genera[[grp]]] <- grp
+}
+
+## RELATIVE LIMB LENGTH
+
+limb_traits <- c("rel_fll", "rel_hll", "rel_tll")
+
+limb_labels <- c(
+  rel_fll = "Relative forelimb length",
+  rel_hll = "Relative hindlimb length",
+  rel_tll = "Relative total limb length"
+)
+
+# Reseting plotting device and layout
+layout(matrix(c(1, 2, 3,
+                4, 4, 4),
+              nrow = 2, byrow = TRUE),
+       heights = c(4, 1))
+
+par(mar = c(5, 4, 3, 1))
+
+for (trait in limb_traits) {
+
+  plot_df <- df[
+    complete.cases(df[, c(
+      "species", "bd_wmean", "hd_l",
+      "focal_group", trait
+    )]) &
+      df$species %in% tree$tip.label,
+  ]
+
+  X <- as.matrix(plot_df[, c("bd_wmean", trait)])
+
+  rownames(X) <- plot_df$species
+
+  colnames(X) <- c(
+    "Soil bulk density",
+    limb_labels[trait]
+  )
+
+  td <- geiger::treedata(
+    phy = tree,
+    data = X,
+    sort = TRUE,
+    warnings = TRUE
+  )
+
+  X_matched <- td$data[td$phy$tip.label, , drop = FALSE]
+
+  # Matching focal groups with tree tips
+  matched_rows <- match(
+    td$phy$tip.label,
+    plot_df$species
+  )
+
+  matched_groups <- plot_df$focal_group[matched_rows]
+
+  point_cols <- unname(box_cols[matched_groups])
+
+  # Creating morphospace
+  phytools::phylomorphospace(
+    tree = td$phy,
+    X = X_matched,
+    label = "off",
+    xlab = "Soil bulk density",
+    ylab = limb_labels[trait],
+    node.size = c(0, 0),
+    pch = NA,
+    col = "grey40",
+    cex = 0
+  )
+
+  # Creating terminal nodes
+  points(
+    X_matched[, 1],
+    X_matched[, 2],
+    pch = 21,
+    bg = point_cols,
+    col = "black",
+    cex = 1.1
+  )
+
+  title(main = paste(
+    "Soil density vs.",
+    limb_labels[trait]
+  ))
+}
+
+# Adding legend
+par(mar = c(0, 0, 0, 0))
+
+plot.new()
+
+legend(
+  "center",
+  legend = c("Focal Group", names(box_cols)),
+  pch = c(NA, rep(21, length(box_cols))),
+  pt.bg = c(NA, box_cols),
+  col = c(NA, rep("black", length(box_cols))),
+  horiz = TRUE,
+  bty = "n",
+  pt.cex = 2,
+  x.intersp = 1.2,
+  inset = c(-0.1, -0.15),
+  cex = 1.4
+)
+
+#dev.off()
+
+```
+## REGRESSION PGLs
+Using had length as covariate to account for the relationship of body size to limb length
+
+``` {r}
+
+#pdf(
+ #"C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/RegressionPGL.pdf",
+ #width = 10,
+  #height = 12
+#)
+
+traits <- c("fll", "hll", "tll")
+
+plots <- list()
+model_results <- data.frame() # creating empty data frame 
+
+for(i in seq_along(traits)) { # created a loop to analyze fll, hll, and tll
+
+  trait <- traits[i]
+
+  # Refining data set
+  plot_dat <- df[, c( # created a smaller data set based on df to only include prescribed variables
+    "species",
+    "focal_group",
+    "bd_wmean",
+    "hd_l",
+    trait
+  )]
+
+  plot_dat <- na.omit(plot_dat) # omits data when there is no value 
+
+  # Match species to tree and removes species that are not present on the tree
+  plot_dat <- plot_dat[
+    plot_dat$species %in% tdat_disc$phy$tip.label,
+  ]
+
+  phy_sub <- ape::keep.tip(
+    tdat_disc$phy,
+    plot_dat$species
+  )
+
+  # Arrange data so that it is the same order as the tree
+  plot_dat <- plot_dat[
+    match(phy_sub$tip.label, plot_dat$species),
+  ]
+
+  rownames(plot_dat) <- plot_dat$species
+
+  # Fiting to a linear model
+  mod_lin <- phylolm(
+    as.formula(
+      paste(trait, "~ bd_wmean + hd_l") # "trait" refers to whichever trait is being analyzed either fll, hll, or tll
+    ),
+    data = plot_dat,
+    phy = phy_sub,
+    model = "lambda" # simulated under Pagel's lambda to account of phylogenetic signal 
+  )
+
+  # Fitting to a quadratic model
+  mod_quad <- phylolm(
+    as.formula(
+      paste(trait, "~ bd_wmean + I(bd_wmean^2) + hd_l")
+    ),
+    data = plot_dat,
+    phy = phy_sub,
+    model = "lambda" # simulated under Pagel's lambda to account of phylogenetic signal 
+  )
+
+  # Comparing linear and quadratic models
+  aic_lin <- AIC(mod_lin)
+  aic_quad <- AIC(mod_quad)
+
+  delta_aic <- aic_lin - aic_quad
+
+  quad_coef <- summary(mod_quad)$coefficients
+
+  model_results <- rbind(
+    model_results,
+    data.frame(
+      Trait = trait,
+      Linear_AIC = aic_lin,
+      Quadratic_AIC = aic_quad,
+      Delta_AIC = delta_aic,
+      Quad_Beta =
+        quad_coef["I(bd_wmean^2)", "Estimate"],
+      Quad_P =
+        quad_coef["I(bd_wmean^2)", "p.value"]
+    )
+  )
+
+  # Creating predictions
+  pred <- data.frame(
+    bd_wmean = seq(
+      min(plot_dat$bd_wmean),
+      max(plot_dat$bd_wmean),
+      length.out = 200
+    ),
+    hd_l = mean(plot_dat$hd_l)
+  )
+
+  pred$linear_fit <- predict( # prediction for linear fit
+    mod_lin,
+    newdata = pred
+  )
+
+  pred$quad_fit <- predict( # prediction for quadratic fit
+    mod_quad,
+    newdata = pred
+  )
+
+  # Plot data and regression lines using ggplot2
+  plots[[i]] <- ggplot(
+    plot_dat,
+    aes(
+      x = bd_wmean,
+      y = .data[[trait]],
+      color = focal_group
+    )
+  ) +
+
+    geom_point(size = 3) +
+
+    geom_line(
+      data = pred,
+      aes(
+        x = bd_wmean,
+        y = linear_fit
+      ),
+      inherit.aes = FALSE,
+      colour = "gray",
+      linewidth = 1,
+      linetype = "dashed" # linear regression line is gray and dashed
+    ) +
+
+    geom_line(
+      data = pred,
+      aes(
+        x = bd_wmean,
+        y = quad_fit
+      ),
+      inherit.aes = FALSE,
+      colour = "black",
+      linewidth = 1 # quadratic regression line is black and solid
+    ) +
+
+    scale_color_manual(
+      values = c(
+        "Anomalopus" = "violet",
+        "Glaphyromorphus" = "blue",
+        "Hemiergis" = "skyblue",
+        "Lerista" = "maroon"
+      ),
+      name = "Focal Group"
+    ) +
+
+    theme_classic() +
+
+    labs(
+      x = "Soil bulk density",
+      y = c(
+        fll = "Forelimb length",
+        hll = "Hindlimb length",
+        tll = "Total limb length"
+      )[trait],
+      subtitle = paste(
+        "Delta AIC =",
+        round(delta_aic, 2)
+      )
+    )
+}
+
+# Display AIC comparison table
+print(model_results)
+
+# Display all three plots on one page
+(plots[[1]] | plots[[2]] | plots[[3]]) +
+  plot_layout(guides = "collect") &
+  theme(
+    legend.position = "bottom",
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 14)
+  )
+
+#dev.off()
+```
+
+## REGRESSION PGL ANALYSIS
+Head length as covariate
+
+```{r}
+
+traits <- c("fll", "hll", "tll")
+
+results <- data.frame() # empty data frame for results
+
+for(trait in traits) { 
+
+  # Refining data set
+  plot_dat <- df[, c( # created a smaller data set based on df to only include prescribed variables
+    "species",
+    "focal_group",
+    "bd_wmean",
+    "hd_l",
+    trait
+  )]
+
+  plot_dat <- na.omit(plot_dat) # omits data when there is no value 
+
+  # Match species to tree and removes species that are not present on the tree
+  plot_dat <- plot_dat[
+    plot_dat$species %in% tdat_disc$phy$tip.label,
+  ]
+
+  phy_sub <- ape::keep.tip(
+    tdat_disc$phy,
+    plot_dat$species
+  )
+
+   # Arrange data so that it is the same order as the tree
+  plot_dat <- plot_dat[
+    match(phy_sub$tip.label, plot_dat$species),
+  ]
+
+  rownames(plot_dat) <- plot_dat$species
+
+  # Fit PGLS model
+  mod <- phylolm(
+    as.formula(
+      paste(trait, "~ bd_wmean + hd_l") # "trait" refers to whichever trait is being analyzed either fll, hll, or tll
+    ),
+    data = plot_dat,
+    phy = phy_sub,
+    model = "lambda" # simulated under Pagel's lambda to account of phylogenetic signal 
+  )
+
+  # Finding coefficients
+  coef_tab <- summary(mod)$coefficients
+
+  beta <- coef_tab["bd_wmean", "Estimate"] # beta
+  se <- coef_tab["bd_wmean", "StdErr"] # standard error
+  p_value <- coef_tab["bd_wmean", "p.value"] # p value
+
+  # Finding R-squared: how much of observed is accounted for by predictors
+  model_summary <- summary(mod)
+
+  r2 <- model_summary$r.squared
+  adj_r2 <- model_summary$adj.r.squared # adjusted for predictors
+
+  # Calculate 95% confidence intervals
+  df_res <- nrow(plot_dat) - length(coef(mod))
+  tcrit <- qt(0.975, df_res)
+
+  lower95 <- beta - tcrit * se
+  upper95 <- beta + tcrit * se
+
+  # Organize results
+  results <- rbind(
+    results,
+    data.frame(
+      Trait = trait,
+      Beta = beta,
+      SE = se,
+      P_value = p_value,
+      R2 = r2,
+      Adjusted_R2 = adj_r2,
+      Lower95CI = lower95,
+      Upper95CI = upper95
+    )
+  )
+}
+
+print(results)
+
+```
+
+## PGLs FOR EACH FOCAL GROUP
+Head length as covariate
+We ran this just to see if any significant patterns jumped out that would be worth investigating further. None did.
+
+```{r}
+#pdf(
+ #"C:/Users/maela/OneDrive/Documents/Files/3M Course/Assignment Stuff/FocalGroupBreakdownPGL.pdf",
+ #width = 10,
+  #height = 12
+#)
+
+traits <- c("fll", "hll", "tll")
+groups <- unique(na.omit(df$focal_group)) # creating object for each focal group; omits data when there is no value
+
+plots <- list()
+counter <- 1
+
+for(trait in traits) { # loop for each trait
+
+  for(grp in groups) { # loop for each focal group
+
+    # Refining data set; filters species by focal group
+    plot_dat <- df[
+      df$focal_group == grp,
+      c(
+        "species",
+        "focal_group",
+        "bd_wmean",
+        "hd_l", 
+        trait
+      )
+    ]
+
+    plot_dat <- na.omit(plot_dat)
+    
+    # Skip groups with fewer than five observations
+    if(nrow(plot_dat) < 5) next # was causing problems
+
+    # Match species to tree and removes species that are not present on the tree
+    plot_dat <- plot_dat[
+      plot_dat$species %in% tdat_disc$phy$tip.label,
+    ]
+
+    # Pruning tree
+    phy_sub <- ape::keep.tip(
+      tdat_disc$phy,
+      plot_dat$species
+    )
+
+    # Arrange data so that it is the same order as the tree
+    plot_dat <- plot_dat[
+      match(phy_sub$tip.label, plot_dat$species),
+    ]
+
+    rownames(plot_dat) <- plot_dat$species
+
+    # Fit PGLS model
+    mod <- phylolm(
+      as.formula(
+        paste(trait, "~ bd_wmean + hd_l") # "trait" refers to whichever trait is being analyzed either fll, hll, or tll
+      ),
+      data = plot_dat,
+      phy = phy_sub,
+      model = "lambda" # simulated under Pagel's lambda to account of phylogenetic signal 
+    )
+
+    print(summary(mod))
+
+    # Creating predictions predictions
+    pred <- data.frame(
+      bd_wmean = seq(
+        min(plot_dat$bd_wmean),
+        max(plot_dat$bd_wmean),
+        length.out = 100
+      ),
+      hd_l = mean(plot_dat$hd_l)
+    )
+
+    pred$fit <- predict(
+      mod,
+      newdata = pred
+    )
+
+    # Plot data with ggplot2
+    plots[[counter]] <- ggplot(
+      plot_dat,
+      aes(
+        x = bd_wmean,
+        y = .data[[trait]]
+      )
+    ) +
+
+      geom_point(
+        color = c(
+          "Anomalopus" = "violet",
+          "Glaphyromorphus" = "blue",
+          "Hemiergis" = "skyblue",
+          "Lerista" = "maroon"
+        )[grp],
+        size = 2
+      ) +
+
+      geom_line(
+        data = pred,
+        aes(
+          x = bd_wmean,
+          y = fit
+        ),
+        color = "black",
+        linewidth = 1
+      ) +
+
+      theme_classic() +
+
+      labs(
+        title = paste(grp, "-", trait),
+        x = "Soil bulk density",
+        y = c(
+          fll = "Forelimb length",
+          hll = "Hindlimb length",
+          tll = "Total limb length"
+        )[trait]
+      )
+
+    counter <- counter + 1
+  }
+}
+
+# Display plots
+wrap_plots(plots)
+
+#dev.off()
+
+```
+
+## REGRESSION PGL ANALYSIS FOR INDIVIDUAL GROUPS
+Head length as covariate 
+
+```{r}
+
+traits <- c("fll", "hll", "tll")
+groups <- unique(na.omit(df$focal_group)) # creating object for each focal group; omits data when there is no value
+
+results3 <- data.frame() # empty data frame for result
+
+# Fit one model per trait for each focal group
+for(trait in traits) { # loop for each trait
+
+  for(grp in groups) { # loop for each focal group 
+
+    # Refining data set; filters species by focal group
+    plot_dat <- df[
+      df$focal_group == grp,
+      c(
+        "species",
+        "focal_group",
+        "bd_wmean",
+        "hd_l",
+        trait
+      )
+    ]
+
+    plot_dat <- na.omit(plot_dat) # omits data when there is no value
+    
+     # Skip groups with fewer than five observations
+    if(nrow(plot_dat) < 5) next # was causing problems
+
+    # Match species to tree and removes species that are not present on the tree
+    plot_dat <- plot_dat[
+      plot_dat$species %in% tdat_disc$phy$tip.label,
+    ]
+
+    # Pruning tree
+    phy_sub <- ape::keep.tip(
+      tdat_disc$phy,
+      plot_dat$species
+    )
+
+    # Arrange data so that it is the same order as the tree
+    plot_dat <- plot_dat[
+      match(phy_sub$tip.label, plot_dat$species),
+    ]
+
+    rownames(plot_dat) <- plot_dat$species
+
+    n_species <- nrow(plot_dat) # recording the number of species in each group; was investigating warnings
+
+    # Fit PGLS model
+    mod <- phylolm(
+      as.formula(
+        paste(trait, "~ bd_wmean + hd_l") # "trait" refers to whichever trait is being analyzed either fll, hll, or tll
+      ),
+      data = plot_dat,
+      phy = phy_sub,
+      model = "lambda" # simulated under Pagel's lambda to account of phylogenetic signal 
+    )
+
+    # Finding coefficients
+    coef_tab <- summary(mod)$coefficients
+
+    beta <- coef_tab["bd_wmean", "Estimate"]
+    p_value <- coef_tab["bd_wmean", "p.value"]
+    se <- coef_tab["bd_wmean", "StdErr"]
+
+    # Finding R-squared: how much of observed is accounted for by predictors
+    mod_summary <- summary(mod)
+
+    r2 <- mod_summary$r.squared
+    adj_r2 <- mod_summary$adj.r.squared # adjusted for predictors
+
+    # Calculate 95% confidence intervals
+    df_res <- n_species - length(coef(mod))
+    tcrit <- qt(0.975, df_res)
+
+    lower95 <- beta - tcrit * se
+    upper95 <- beta + tcrit * se
+
+    # Organize results
+    results3 <- rbind(
+      results3,
+      data.frame(
+        Trait = trait,
+        Group = grp,
+        N_species = n_species,
+        Beta = beta,
+        SE = se,
+        P_value = p_value,
+        R2 = r2,
+        Adjusted_R2 = adj_r2,
+        Lower95CI = lower95,
+        Upper95CI = upper95
+      )
+    )
+  }
+}
+
+print(results3)
+
+# Note that this comes with a lot of warnings, I believe this is because of the low sample size for many of the groups. We ran this just to see if any significant patterns jumped out that would be worth investigating further. None did.
+```
+
+## RELATIVE LIMB PCA
+Analysis and plotting
+
+```{r}
+
+## PCA ANALYSIS 
+
+genus <- sub("_.*$", "", df$species)
+
+focal_genera <- list(
+  "Anomalopus" = c(
+    "Anomalopus", "Calyptotis", "Coeranoscincus",
+    "Coggeria", "Ophioscincus", "Concinnia",
+    "Nangura", "Silvascincus"
+  ),
+  "Glaphyromorphus" = c("Glaphyromorphus", "Eulamprus"),
+  "Hemiergis" = c("Hemiergis", "Eremiascincus"),
+  "Lerista" = c("Lerista", "Ctenotus")
+)
+
+df$focal_group <- NA_character_
+
+for (grp in names(focal_genera)) {
+  df$focal_group[genus %in% focal_genera[[grp]]] <- grp
+}
+
+# Refining dataset
+pca_dat2 <- df %>% # created a smaller data set based on df to only include prescribed variables
+  dplyr::select( 
+    species,
+    focal_group,
+    hd_l,
+    fll,
+    hll,
+    tll
+  ) %>%
+  na.omit()
+
+
+# Calculating relative limb lengths
+pca_dat2$rel_fll <- pca_dat2$fll / pca_dat2$hd_l
+pca_dat2$rel_hll <- pca_dat2$hll / pca_dat2$hd_l
+pca_dat2$rel_tll <- pca_dat2$tll / pca_dat2$hd_l
+
+# Morphological traits for PCA
+pca_traits2 <- as.matrix(
+  pca_dat2[, c("rel_fll", "rel_hll", "rel_tll")]
+)
+
+# Assigning species names to rows
+rownames(pca_traits2) <- pca_dat2$species
+
+# Match species to tree and removes species that are not present on the tree
+td_pca2 <- geiger::treedata(
+  phy = tdat_disc$phy,
+  data = pca_traits2,
+  sort = TRUE
+)
+
+# Creating Phylogenetic PCA
+morph_pca2 <- phytools::phyl.pca(
+  td_pca2$phy,
+  td_pca2$data,
+  method = "lambda", # simulated under Pagel's lambda to account of phylogenetic signal 
+  mode = "corr"
+)
+
+# PCA summary
+summary(morph_pca2)
+
+# Loadings
+morph_pca2$L
+
+# Calculating variance
+100 * morph_pca2$Eval / sum(morph_pca2$Eval)
+
+# Extract PCA scores
+scores2 <- data.frame(
+  species = rownames(morph_pca2$S),
+  MorphPC1 = morph_pca2$S[, 1],
+  MorphPC2 = morph_pca2$S[, 2]
+)
+
+# Adding focal groups
+scores2 <- dplyr::left_join(
+  scores2,
+  pca_dat2[, c("species", "focal_group")],
+  by = "species"
+)
+
+# Removing old PCA columns (necessary to run code multiple times)
+df <- df %>%
+  dplyr::select(
+    -any_of(c("MorphPC1", "MorphPC2"))
+  )
+
+# Adding PCA to dataset 
+df <- dplyr::left_join(
+  df,
+  scores2,
+  by = "species"
+)
+
+# Results
+summary(df$MorphPC1)
+summary(df$MorphPC2)
+
+
+## PCA PLOT 
+
+# Creating data set for plotting
+pca_scores2 <- data.frame(
+  PC1 = morph_pca2$S[, 1],
+  PC2 = morph_pca2$S[, 2],
+  focal_group = scores2$focal_group
+)
+
+# Plotting PCA (PC1 vs PC2) with ggplot2
+ggplot(
+  pca_scores2,
+  aes(
+    x = PC1,
+    y = PC2,
+    colour = focal_group
+  )
+) +
+
+  geom_point(
+    size = 3,
+    alpha = 0.8
+  ) +
+
+  scale_color_manual(
+    values = c(
+      "Anomalopus" = "violet",
+      "Glaphyromorphus" = "blue",
+      "Hemiergis" = "skyblue",
+      "Lerista" = "maroon"
+    )
+  ) +
+
+  theme_classic() +
+
+  labs(
+    x = "PC1 (55.5%)", # mannually including percentages to axis
+    y = "PC2 (33.2%)", # mannually including percentages to axis
+  colour = "Focal Group"
+)
+
+```
+
+## PCA MORPHOSPACE PLOT
+
+```{r}
+
+# Finding PC1 scores
+pc1_soil_dat2 <- data.frame(
+  species = rownames(morph_pca2$S),
+  MorphPC1 = morph_pca2$S[, 1]
+)
+
+# Adding focal groups
+pc1_soil_dat2 <- pc1_soil_dat2 %>%
+  left_join(
+    pca_dat2 %>%
+      dplyr::select(species, focal_group),
+    by = "species"
+  )
+
+# Adding soil density
+pc1_soil_dat2 <- pc1_soil_dat2 %>%
+  left_join(
+    df %>%
+      dplyr::select(species, bd_wmean),
+    by = "species"
+  )
+
+pc1_soil_dat2 <- na.omit(pc1_soil_dat2) # omits data when there is no value
+
+
+## PC1 VS SOIL DENSITY ANALYSIS
+
+# Refining data set
+plot_dat2 <- df %>% # created a smaller data set based on df to only include prescribed variables
+  dplyr::select(
+    species,
+    bd_wmean,
+    MorphPC1
+  ) %>%
+  na.omit()
+
+# Matching species with tree
+plot_dat2 <- plot_dat2[
+  plot_dat2$species %in% tdat_disc$phy$tip.label,
+]
+
+phy_sub2 <- ape::keep.tip( # removes species not in phylogeny
+  tdat_disc$phy,
+  plot_dat2$species
+)
+
+# Arrange data so that it is the same order as the tree
+plot_dat2 <- plot_dat2[
+  match(phy_sub2$tip.label, plot_dat2$species),
+]
+
+rownames(plot_dat2) <- plot_dat2$species
+
+# Fit PGLS model
+mod_pc1.2 <- phylolm(
+  MorphPC1 ~ bd_wmean,
+  data = plot_dat2,
+  phy = phy_sub2,
+  model = "lambda" # simulated under Pagel's lambda to account of phylogenetic signal 
+)
+
+# Results
+summary(mod_pc1.2)
+
+
+## PLOTTING PC1 VS SOIL DENSITY
+
+# Plotting with ggplot2
+ggplot(
+  pc1_soil_dat2,
+  aes(
+    x = bd_wmean,
+    y = MorphPC1,
+    colour = focal_group
+  )
+) +
+
+  geom_point(
+    size = 3,
+    alpha = 0.8
+  ) +
+
+  scale_color_manual(
+    values = c(
+      "Anomalopus" = "violet",
+      "Glaphyromorphus" = "blue",
+      "Hemiergis" = "skyblue",
+      "Lerista" = "maroon"
+    )
+  ) +
+
+  geom_smooth(
+    aes(group = 1),
+    method = "lm",
+    se = TRUE,
+    colour = "black"
+  ) +
+
+  theme_classic() +
+
+  labs(
+    x = "Soil bulk density",
+    y = "Morphology PC1",
+    colour = "Focal Group"
+  )
+
+```
+
+
+## FIT MODELS
+Using relative limb length and PCA axis
+
+```{r}
+
+library(geiger)
+library(ape)
+library(dplyr)
+
+# # Calculating relative limb lengths
+
+df$rel_fll <- df$fll / df$hd_l
+df$rel_hll <- df$hll / df$hd_l
+df$rel_tll <- df$tll / df$hd_l
+
+traits <- c(
+  "rel_fll",
+  "rel_hll",
+  "rel_tll",
+  "MorphPC1"
+)
+
+phy <- tdat_disc$phy
+
+model_results <- list()
+
+for(trait in traits){
+
+# Refining data set 
+
+  trait_dat <- df %>% 
+    dplyr::select(
+      species,
+      all_of(trait)
+    ) %>%
+    na.omit()
+
+  trait_vec <- trait_dat[[trait]]
+  names(trait_vec) <- trait_dat$species
+  
+  # Match species to tree and removes species that are not present on the tree
+  td <- treedata(
+    phy = phy,
+    data = trait_vec,
+    sort = TRUE
+  )
+
+  vec <- td$data[,1]
+  names(vec) <- rownames(td$data)
+
+
+# Fit models
+
+  BM_fit <- fitContinuous(td$phy,vec,model = "BM")
+  OU_fit <- fitContinuous(td$phy,vec,model = "OU")
+  EB_fit <- fitContinuous(td$phy,vec,model = "EB")
+  Delta_fit <- fitContinuous(td$phy, vec, model = "delta")
+  Lambda_fit <- fitContinuous(td$phy,vec,model = "lambda")
+  WN_fit <- fitContinuous(td$phy,vec,model = "white")
+
+  
+  tmp <- data.frame(Trait = trait,Model = c("BM","OU","EB","delta","Lambda", "White"),
+
+    # Finding log likelihood for each model
+    logLik = c(
+      BM_fit$opt$lnL,
+      OU_fit$opt$lnL,
+      EB_fit$opt$lnL,
+      Delta_fit$opt$lnL,
+      Lambda_fit$opt$lnL,
+      WN_fit$opt$lnL
+    ),
+    
+    # Finding AICc for each model
+    AICc = c(
+      BM_fit$opt$aicc,
+      OU_fit$opt$aicc,
+      EB_fit$opt$aicc,
+      Delta_fit$opt$aicc,
+      Lambda_fit$opt$aicc,
+      WN_fit$opt$aicc
+
+    )
+  )
+  
+  tmp <- tmp %>%
+  mutate(
+    Delta_AICc = AICc - min(AICc), # caclucating delta AICc
+    AkaikeWeight = # calculating Akaike weight 
+      exp(-0.5 * Delta_AICc) /
+      sum(exp(-0.5 * Delta_AICc))
+  ) %>%
+  arrange(Delta_AICc)
+  best_model <- tmp$Model[1]
+  tmp$BestModel <- best_model
+  model_results[[trait]] <- tmp
+  
+}
+
+
+all_models <- do.call(
+  rbind,
+  model_results
+)
+
+all_models
+
+```
+
+# Parameter Uncertainty and Model Comparison
+Head length as covariate
+
+```{r}
+
+library(ape)
+
+set.seed(123)
+
+nsim <- 1000
+traits <- c("fll", "hll", "tll")
+
+uncertainty_results <- list()
+comparison_results <- list()
+simulation_results <- list()
+
+# Creating function for calculating AICc
+model_aicc <- function(mod) {
+
+  k <- mod$p
+  n <- mod$n
+
+  if (n <= k + 1) {
+    stop("Too few species to calculate AICc.") # check that there are enough species to run the AICc calculation
+  }
+  # below is the AICc formula
+  -2 * as.numeric(mod$logLik) +
+    2 * k +
+    (2 * k * (k + 1)) / (n - k - 1)
+}
+
+
+# Fit models
+
+for (trait in traits) {
+
+  plot_dat <- df[, c("species", "bd_wmean", "hd_l", trait)]
+  plot_dat <- na.omit(plot_dat)
+
+  # Matching species with tree (same code as used many times above)
+
+  phy <- ape::keep.tip(
+    tdat_disc$phy,
+    intersect(tdat_disc$phy$tip.label, plot_dat$species)
+  )
+
+  plot_dat <- plot_dat[
+    match(phy$tip.label, plot_dat$species),
+  ]
+
+  rownames(plot_dat) <- plot_dat$species
+
+  # Creating predictors; equation subtracts the observed variable from the mean of hte observed variable
+
+  plot_dat$soil_c <- plot_dat$bd_wmean -
+    mean(plot_dat$bd_wmean) # soil_c is predictor variable for soil density
+
+  plot_dat$head_c <- plot_dat$hd_l -
+    mean(plot_dat$hd_l) # head_c is the predictor variable for head length
+
+
+  # Creating models
+
+  formulas <- list(
+
+    Linear = as.formula(
+      paste(trait, "~ soil_c + head_c")
+    ),
+
+    Quadratic = as.formula(
+      paste(trait, "~ soil_c + I(soil_c^2) + head_c")
+    )
+  )
+
+
+  # Fit models and create parametic bootstraps
+
+  mods <- lapply(formulas, function(f) {
+
+    phylolm::phylolm(
+      formula = f,
+      data = plot_dat,
+      phy = phy,
+      model = "lambda",
+      boot = nsim,
+      full.matrix = TRUE,
+      save = TRUE
+    )
+  })
+
+
+  # Creating empty matrix for model comparison
+
+  delta_aicc <- matrix(NA_real_,nrow = nsim,ncol = 2,dimnames = list(NULL, names(mods))
+  )
+
+  # Finding parameter uncertainty
+
+  for (generating in names(mods)) {
+
+    mod <- mods[[generating]]
+
+    # Original parameter estimates
+
+    estimates <- c(
+      coef(mod),
+      sigma2 = mod$sigma2,
+      lambda = unname(mod$optpar)
+    )
+
+    boot <- as.matrix(mod$bootstrap) # bootstrap estimating
+
+    if (is.null(colnames(boot))) {
+      stop("Bootstrap parameter names are missing.")
+    }
+
+    # Check that the fitted parameters match
+
+    if (!all(names(estimates) %in% colnames(boot))) {
+      stop(
+        "Bootstrap parameter names do not match estimates. ",
+        "Check colnames(mod$bootstrap)."
+      )
+    }
+
+    boot <- boot[, names(estimates), drop = FALSE]
+
+    # Calculate percentile 95% confidence intervals
+
+    ci <- apply(boot,2,quantile,probs = c(0.025, 0.975),na.rm = TRUE)
+
+
+    # Save parameter uncertainty
+
+    key <- paste(trait, generating, sep = "_")
+
+    uncertainty_results[[key]] <- data.frame(
+      Trait = trait,
+      Model = generating,
+      Parameter = names(estimates),
+      Estimate = unname(estimates),
+      Lower95 = ci[1, ],
+      Upper95 = ci[2, ],
+      Successful = colSums(is.finite(boot)),
+      Attempted = nsim
+    )
+
+    simulation_results[[key]] <- boot
+
+
+    # Refit models to simulated data
+
+    sim_data <- mod$bootdata
+
+    for (i in seq_len(ncol(sim_data))) {
+
+      sim_y <- sim_data[, i]
+
+      if (!is.null(rownames(sim_data))) { # matching simulated values to species
+        sim_y <- sim_y[phy$tip.label]
+      } else {
+        names(sim_y) <- phy$tip.label
+      }
+
+      sim_dat <- plot_dat
+      sim_dat[[trait]] <- as.numeric(sim_y)
+
+      fits <- lapply(formulas, function(f) {  # fit both models to the same simulated data set
+
+        tryCatch(
+
+          phylolm::phylolm(
+            formula = f,
+            data = sim_dat,
+            phy = phy,
+            model = "lambda"
+          ),
+
+          error = function(e) NULL
+        )
+      })
+
+
+      if (any(vapply(fits, is.null, logical(1)))) { # only calculate model support when both models fit
+        next
+      }
+
+      delta_aicc[i, generating] <-
+        model_aicc(fits$Linear) -
+        model_aicc(fits$Quadratic)
+    }
+  }
+
+
+  # Estimating model discrimination 
+
+  linear_sim <- delta_aicc[, "Linear"]
+  quad_sim <- delta_aicc[, "Quadratic"]
+
+  linear_sim <- linear_sim[is.finite(linear_sim)]
+  quad_sim <- quad_sim[is.finite(quad_sim)]
+
+  if (!length(linear_sim) || !length(quad_sim)) {
+    stop("No successful paired refits for ", trait)
+  }
+
+  comparison_results[[trait]] <- data.frame(
+
+    Trait = trait,
+
+    Observed_Delta_AICc =
+      model_aicc(mods$Linear) -
+      model_aicc(mods$Quadratic),
+
+    False_positive = mean(linear_sim > 0),
+    Power = mean(quad_sim > 0),
+    False_negative = mean(quad_sim <= 0),
+    Successful_linear = length(linear_sim),
+    Successful_quadratic = length(quad_sim),
+    Attempted_each = nsim
+  )
+
+  simulation_results[[paste0(trait, "_Delta_AICc")]] <-
+    delta_aicc
+
+
+  # Plot model with histogram
+
+  breaks <- pretty(
+    range(c(linear_sim, quad_sim)),
+    n = 25
+  )
+
+  h1 <- hist(linear_sim, breaks = breaks, plot = FALSE)
+  h2 <- hist(quad_sim, breaks = breaks, plot = FALSE)
+
+  plot(
+    h1,
+    col = rgb(1, 0, 0, 0.5),
+    ylim = c(0, max(h1$counts, h2$counts)),
+    main = trait,
+    xlab = "Delta AICc: Linear minus Quadratic"
+  )
+
+  plot(
+    h2,
+    col = rgb(0, 0, 1, 0.5),
+    add = TRUE
+  )
+
+  abline(v = 0, lty = 2)
+
+  legend(
+    "topright",
+    c("Simulated Linear", "Simulated Quadratic"),
+    fill = c(
+      rgb(1, 0, 0, 0.5),
+      rgb(0, 0, 1, 0.5)
+    ),
+    bty = "n"
+  )
+}
+
+
+# RESULTS
+
+parameter_uncertainty <- do.call(
+  rbind,
+  uncertainty_results
+)
+
+model_comparison <- do.call(
+  rbind,
+  comparison_results
+)
+
+print(parameter_uncertainty)
+print(model_comparison)
+
+```
+
